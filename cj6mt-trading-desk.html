@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1a212b; --panel:#222c38; --panel2:#2a3542; --line:#364353;
+  --text:#dde4ec; --muted:#8d9aab;
+  --amber:#e6a940; --teal:#43b9a7; --blue:#72a0ea; --violet:#b48fe3; --red:#e8715f;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif}
+h1,h2,h3,h4,th,button,.badge,.num{font-family:'Barlow Semi Condensed','Arial Narrow',system-ui,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--blue)}
+.muted{color:var(--muted)}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:4px;padding:6px 12px;font-size:15px;font-weight:600;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--teal);border-color:var(--teal);color:#0f1a1a}
+button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:inherit}
+
+.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand h1{margin:0;font-size:24px;font-weight:700;letter-spacing:.01em}
+.brand span{font-size:14px}
+.chars{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:2px 10px;font-size:13px}
+.chip.expired{border-color:var(--red);color:var(--red)}
+.actions{display:flex;gap:8px;align-items:center}
+.status{padding:8px 20px;font-size:14px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.status.err{color:var(--red)} .status.ok{color:var(--teal)}
+
+main{padding:20px;max-width:1500px;margin:0 auto}
+.setup{max-width:680px}
+.setup h2{font-size:22px;margin:0 0 8px}
+.setup ol{padding-left:20px} .setup li{margin:6px 0}
+.setup code{background:var(--panel2);padding:1px 5px;border-radius:3px;word-break:break-all}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.results button{display:block;width:100%;text-align:left;margin:6px 0;font-weight:500}
+
+.lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:28px}
+@media (max-width:980px){.lanes{grid-template-columns:1fr}}
+.lane{background:var(--panel);border-radius:4px;border-top:3px solid var(--line);padding:12px 14px;max-height:460px;overflow:auto}
+.lane h2{margin:0 0 10px;font-size:19px;display:flex;justify-content:space-between}
+.lane-upd{border-top-color:var(--amber)} .lane-sell{border-top-color:var(--teal)} .lane-buy{border-top-color:var(--blue)}
+.count{color:var(--muted);font-weight:500}
+.card{border-bottom:1px solid var(--line);padding:9px 0}
+.card:last-child{border-bottom:0}
+.card h3{margin:0 0 2px;font-size:16px;font-weight:600}
+.card p{margin:2px 0;font-size:14px}
+.card .warn{color:var(--red)}
+.copy{padding:1px 8px;font-size:14px;font-variant-numeric:tabular-nums}
+.copy.done{border-color:var(--teal);color:var(--teal)}
+.empty{color:var(--muted);font-size:14px;margin:4px 0}
+
+.tablebar{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:8px}
+.tablebar h2{margin:0;font-size:20px}
+.tablebar .add{display:flex;gap:6px;flex:1;max-width:560px}
+.tablebar .add input{flex:1}
+.tablewrap{overflow-x:auto;background:var(--panel);border-radius:4px}
+table.main{border-collapse:collapse;width:100%;min-width:1300px;font-size:14px}
+table.main th{text-align:right;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;font-size:14px}
+table.main th:first-child,table.main td:first-child{text-align:left}
+table.main th.sorted{color:var(--text)}
+table.main td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.main tr.item{cursor:pointer}
+table.main tr.item:hover td{background:var(--panel2)}
+table.main tr.item td:first-child{font-weight:600;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.auto{color:var(--muted);font-weight:400;font-size:12px;margin-left:4px}
+.pos{color:var(--teal)} .neg{color:var(--red)}
+.bar{display:inline-block;position:relative;width:70px;height:8px;border-radius:4px;vertical-align:middle;margin-right:6px;
+  background:linear-gradient(90deg,rgba(114,160,234,.35) 0 var(--lo),var(--panel2) var(--lo) var(--hi),rgba(67,185,167,.35) var(--hi) 100%)}
+.bar i{position:absolute;top:-3px;width:3px;height:14px;background:var(--text);border-radius:1px;transform:translateX(-1px)}
+.badge{display:inline-block;padding:1px 8px;border-radius:3px;font-size:13px;font-weight:600}
+.b-update{background:var(--amber);color:#1d1606} .b-sell{background:var(--teal);color:#0d1d1a}
+.b-buy{background:var(--blue);color:#0c1628} .b-import{background:var(--violet);color:#1a1027}
+.b-hold{background:var(--panel2);color:var(--text)} .b-watch{color:var(--muted)}
+tr.detailrow td{background:var(--bg);text-align:left;white-space:normal;padding:14px}
+.detail{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:18px}
+@media (max-width:1100px){.detail{grid-template-columns:1fr 1fr}}
+.detail h4{margin:0 0 6px;font-size:15px;color:var(--muted);font-weight:600}
+.detail table{border-collapse:collapse;width:100%}
+.detail td{padding:2px 0;border:0;text-align:right;font-variant-numeric:tabular-nums}
+.detail td:first-child{text-align:left}
+.detail tr.mine td{color:var(--amber)}
+.detail label{display:block;margin-bottom:6px}
+.detail label input{display:block;width:100%;margin-top:4px}
+.spark{width:100%;height:auto;display:block}
+.filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:-6px 0 18px}
+.filters input[type=search]{flex:1;min-width:220px;max-width:420px}
+select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:inherit}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;border-radius:0;padding:8px 14px;color:var(--muted);font-size:17px}
+.tabs button[aria-selected=true]{color:var(--text);border-bottom-color:var(--teal)}
+.mats td,.mats th{padding:3px 8px 3px 0}
+.mats th{color:var(--muted);font-weight:600;text-align:right}
+.mats th:first-child{text-align:left}
+.foot{font-size:13px;margin-top:16px;max-width:80ch}
+
+aside.settings{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--panel);border-left:1px solid var(--line);padding:18px 20px;overflow:auto;z-index:10}
+aside.settings h2{margin:0 0 12px;font-size:21px;display:flex;justify-content:space-between;align-items:center}
+aside.settings h3{font-size:16px;margin:20px 0 6px;color:var(--muted)}
+aside.settings label{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:8px 0;font-size:14px}
+aside.settings label input[type=number]{width:120px;text-align:right}
+aside.settings label input[type=text]{width:220px}
+aside.settings .hint{font-size:13px;color:var(--muted);margin:2px 0 8px}
+@media (prefers-reduced-motion:no-preference){.copy{transition:border-color .2s,color .2s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><h1 id="title">Trading desk</h1><span id="where" class="muted"></span></div>
+  <div id="chars" class="chars"></div>
+  <div class="actions">
+    <span id="updated" class="muted num"></span>
+    <button id="btnRefresh" class="primary">Refresh</button>
+    <button id="btnSettings">Settings</button>
+  </div>
+</header>
+<div id="status" class="status" hidden></div>
+<main>
+  <section id="setup" class="setup" hidden></section>
+  <section id="desk" hidden>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="market" aria-selected="true">Market</button>
+      <button role="tab" data-tab="mats" aria-selected="false">Material cost</button>
+    </div>
+    <div class="filters">
+      <input id="fText" type="search" placeholder="Filter by name or group, e.g. armor repairer, dread" aria-label="Filter items">
+      <select id="fKind" aria-label="Item type"><option value="">T1 capital modules and T1 ships</option><option value="m">T1 capital modules</option><option value="s">T1 ships</option></select>
+      <label><input type="checkbox" id="fActive" checked> Only items with sellers or recent sales</label>
+    </div>
+    <div id="tabMarket">
+    <div class="lanes">
+      <div class="lane lane-upd"><h2>Orders to update <span class="count" id="cUpd"></span></h2><div id="lUpd"></div></div>
+      <div class="lane lane-sell"><h2>Sell from hangar <span class="count" id="cSell"></span></h2><div id="lSell"></div></div>
+      <div class="lane lane-buy"><h2>Buy or import <span class="count" id="cBuy"></span></h2><div id="lBuy"></div></div>
+    </div>
+    <div class="tablebar"><h2>Watched items</h2><span class="muted num" id="shown"></span></div>
+    <div class="tablewrap"><table class="main" id="tbl"><thead></thead><tbody></tbody></table></div>
+    <p class="foot muted">Click a row for price history, the local order book and your cost. The list covers Tech I capital modules and T1 ships (no rigs, no named meta variants, and nothing where a rare BPC is most of the cost), whether you own them or not. Hide any you don't trade with "Stop watching"; Settings can restore them. Orders on other items aren't tracked. Price history is region-wide, so it includes any other markets in the region. Corporation hangars and corporation orders are not included. The structure market refreshes about every 5 minutes on CCP's side.</p>
+    </div>
+    <div id="tabMats" hidden>
+      <div class="tablebar"><h2>Material cost vs market price</h2></div>
+      <div class="tablewrap"><table class="main" id="mtbl"><thead></thead><tbody></tbody></table></div>
+      <p class="foot muted" id="matsFoot"></p>
+    </div>
+  </section>
+</main>
+<aside id="settings" class="settings" hidden></aside>
+
+<script>
+'use strict';
+if (['0.0.0.0','[::]','::'].includes(location.hostname)) location.replace(location.href.replace(location.host, 'localhost:' + location.port));
+const ESI = 'https://esi.evetech.net/latest';
+const SSO = 'https://login.eveonline.com/v2/oauth';
+const JITA_REGION = 10000002, JITA_4_4 = 60003760, KEEPSTAR = 35834;
+const REDIRECT = location.origin + location.pathname;
+const SCOPES = [
+  'esi-markets.structure_markets.v1',
+  'esi-markets.read_character_orders.v1',
+  'esi-assets.read_assets.v1',
+  'esi-wallet.read_character_wallet.v1',
+  'esi-universe.read_structures.v1',
+  'esi-search.search_structures.v1'
+].join(' ');
+const KEY = 'cjdesk:v1', TKEY = 'cjdesk:types:v1', AKEY = 'cjdesk:alerted:v1';
+const DEF = {salesTax:3.37, brokerFee:1.0, freightPerM3:null, collateralPct:1.0, targetMargin:10,
+  lowPct:25, highPct:75, historyDays:90, hangarMinValue:50, autoRefresh:false, notify:false, me:10};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function loadJSON(k, fb){ try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : fb; } catch { return fb; } }
+function saveJSON(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+let S = Object.assign({clientId:'', chars:{}, structure:null, watch:[], hidden:[], costOverrides:{}}, loadJSON(KEY, {}));
+S.settings = Object.assign({}, DEF, S.settings || {});
+let T = loadJSON(TKEY, {});
+function save(){ saveJSON(KEY, S); saveJSON(TKEY, T); }
+/* Tech I capital modules (packaged volume 1,000 m3 or more) and T1 ships, excluding rigs, named meta variants, and items where a rare BPC is most of the cost (capital ancillaries and Triglavian hulls are included),
+   built from CCP's static data: [typeID, name, packaged volume, kind (m = module, s = ship), group] */
+const CATALOG = [[40348,"25000mm Steel Plates I",1000.0,"m","25000mm Armor Plate"],[41236,"10000MN Afterburner I",1000.0,"m","Afterburners"],[41503,"Capital Ancillary Armor Repairer",1000.0,"m","Armor Repairers"],[20701,"Capital Armor Repairer I",1000.0,"m","Armor Repairers"],[20454,"Quad 3500mm Siege Artillery I",1000.0,"m","Artillery Cannons"],[20452,"Hexa 2500mm Repeating Cannon I",1000.0,"m","Autocannons"],[37289,"Quad 800mm Repeating Cannon I",1000.0,"m","Autocannons"],[20446,"Dual Giga Beam Laser I",1000.0,"m","Beam Lasers"],[20450,"Ion Siege Blaster I",1000.0,"m","Blasters"],[37291,"Triple Neutron Blaster Cannon I",1000.0,"m","Blasters"],[27678,"ECM Jammer Burst Projector",2000.0,"m","Burst Projectors"],[40636,"Energy Neutralization Burst Projector",2000.0,"m","Burst Projectors"],[40697,"Sensor Dampening Burst Projector",2000.0,"m","Burst Projectors"],[40635,"Stasis Webification Burst Projector",2000.0,"m","Burst Projectors"],[40698,"Target Illumination Burst Projector",2000.0,"m","Burst Projectors"],[40696,"Warp Disruption Burst Projector",2000.0,"m","Burst Projectors"],[40699,"Weapon Disruption Burst Projector",2000.0,"m","Burst Projectors"],[41484,"Capital Cap Battery I",1000.0,"m","Capacitor Batteries"],[41491,"Capital Capacitor Booster I",1000.0,"m","Capacitor Boosters"],[23735,"Clone Vat Bay I",4000.0,"m","Clone Vat Bays"],[56735,"Tactical Capsuleer Recloner",4000.0,"m","Clone Vat Bays"],[62632,"Capital Asteroid Ore Compressor I",2000.0,"m","Compressors"],[62634,"Capital Gas Compressor I",2000.0,"m","Compressors"],[62633,"Capital Ice Compressor I",2000.0,"m","Compressors"],[62635,"Capital Mercoxit Compressor I",2000.0,"m","Compressors"],[62636,"Capital Moon Ore Compressor I",2000.0,"m","Compressors"],[40714,"Capital Emergency Hull Energizer I",2000.0,"m","Damage Controls"],[24283,"Fighter Support Unit I",1000.0,"m","Drone Upgrades"],[40659,"Capital Energy Neutralizer I",1000.0,"m","Energy Neutralizers"],[40665,"Capital Energy Nosferatu I",1000.0,"m","Energy Nosferatu"],[41511,"Capital Hull Repairer I",1000.0,"m","Hull Repairers"],[63140,"Industrial Jump Portal Generator I",5000.0,"m","Jump Portal Generators"],[23953,"Jump Portal Generator I",10000.0,"m","Jump Portal Generators"],[41249,"50000MN Microwarpdrive I",1000.0,"m","Microwarpdrives"],[20444,"Dual Giga Pulse Laser I",1000.0,"m","Pulse Lasers"],[37290,"Quad Mega Pulse Laser I",1000.0,"m","Pulse Lasers"],[20448,"Dual 1000mm Railgun I",1000.0,"m","Railguns"],[37288,"Rapid Torpedo Launcher I",1000.0,"m","Rapid Torpedo Launchers"],[41479,"Capital Ancillary Remote Armor Repairer",1000.0,"m","Remote Armor Repairers"],[24569,"Capital Remote Armor Repairer I",1000.0,"m","Remote Armor Repairers"],[12219,"Capital Remote Capacitor Transmitter I",1000.0,"m","Remote Capacitor Transmitters"],[27934,"Capital Remote Hull Repairer I",1000.0,"m","Remote Hull Repairers"],[41483,"Capital Ancillary Remote Shield Booster",1000.0,"m","Remote Shield Boosters"],[3616,"Capital Remote Shield Booster I",1000.0,"m","Remote Shield Boosters"],[41515,"Capital Flex Armor Hardener I",1000.0,"m","Scriptable Armor Hardeners"],[41516,"Capital Flex Shield Hardener I",1000.0,"m","Scriptable Shield Hardeners"],[90475,"Integrated Sensor Array",1000.0,"m","Sensor Boosters"],[41411,"Networked Sensor Array",1000.0,"m","Sensor Boosters"],[41504,"Capital Ancillary Shield Booster",1000.0,"m","Shield Boosters"],[20703,"Capital Shield Booster I",1000.0,"m","Shield Boosters"],[40354,"Capital Shield Extender I",1000.0,"m","Shield Extenders"],[28583,"Capital Industrial Core I",1000.0,"m","Siege Modules"],[20280,"Siege Module I",1000.0,"m","Siege Modules"],[27951,"Triage Module I",1000.0,"m","Siege Modules"],[77398,"'Atgeir' Explosive Disruptive Lance",4000.0,"m","Superweapons"],[24554,"'Aurora Ominae' Thermal Doomsday",2000.0,"m","Superweapons"],[77399,"'Azmaru' Electromagnetic Disruptive Lance",4000.0,"m","Superweapons"],[41442,"'Cold Wind' Kinetic Reaper",2000.0,"m","Superweapons"],[40632,"'Divine Harvest' Electromagnetic Reaper",2000.0,"m","Superweapons"],[41441,"'Geiravor' Explosive Lance",2000.0,"m","Superweapons"],[23674,"'Gjallarhorn' Explosive Doomsday",2000.0,"m","Superweapons"],[41443,"'Guillotine' Thermal Reaper",2000.0,"m","Superweapons"],[40631,"'Holy Destiny' Electromagnetic Lance",2000.0,"m","Superweapons"],[41439,"'Iron Pike' Kinetic Lance",2000.0,"m","Superweapons"],[41444,"'Jormungandr' Explosive Reaper",2000.0,"m","Superweapons"],[24550,"'Judgment' Electromagnetic Doomsday",2000.0,"m","Superweapons"],[24552,"'Oblivion' Kinetic Doomsday",2000.0,"m","Superweapons"],[41440,"'Phalarica' Thermal Lance",2000.0,"m","Superweapons"],[77401,"'Sarissa' Thermal Disruptive Lance",4000.0,"m","Superweapons"],[77400,"'Steel Yari' Kinetic Disruptive Lance",4000.0,"m","Superweapons"],[43658,"Amarr Phenomena Generator",8000.0,"m","Superweapons"],[40633,"Bosonic Field Generator",2000.0,"m","Superweapons"],[43660,"Caldari Phenomena Generator",8000.0,"m","Superweapons"],[43662,"Gallente Phenomena Generator",8000.0,"m","Superweapons"],[40634,"Gravitational Transportation Field Oscillator",2000.0,"m","Superweapons"],[43664,"Minmatar Phenomena Generator",8000.0,"m","Superweapons"],[42522,"Pulse Activated Nexus Invulnerability Core",8000.0,"m","Superweapons"],[24644,"Capital Tractor Beam I",1000.0,"m","Tractor Beams"],[32444,"XL Cruise Missile Launcher I",1000.0,"m","XL Launchers"],[20539,"XL Torpedo Launcher I",1000.0,"m","XL Launchers"],[16229,"Brutix",15000.0,"s","Battlecruisers"],[16231,"Cyclone",15000.0,"s","Battlecruisers"],[24698,"Drake",15000.0,"s","Battlecruisers"],[49711,"Drekavac",15000.0,"s","Battlecruisers"],[16227,"Ferox",15000.0,"s","Battlecruisers"],[24696,"Harbinger",15000.0,"s","Battlecruisers"],[24702,"Hurricane",15000.0,"s","Battlecruisers"],[24700,"Myrmidon",15000.0,"s","Battlecruisers"],[4306,"Naga",15000.0,"s","Battlecruisers"],[4302,"Oracle",15000.0,"s","Battlecruisers"],[16233,"Prophecy",15000.0,"s","Battlecruisers"],[4308,"Talos",15000.0,"s","Battlecruisers"],[4310,"Tornado",15000.0,"s","Battlecruisers"],[24692,"Abaddon",50000.0,"s","Battleships"],[642,"Apocalypse",50000.0,"s","Battleships"],[643,"Armageddon",50000.0,"s","Battleships"],[645,"Dominix",50000.0,"s","Battleships"],[24690,"Hyperion",50000.0,"s","Battleships"],[47271,"Leshak",50000.0,"s","Battleships"],[24694,"Maelstrom",50000.0,"s","Battleships"],[641,"Megathron",50000.0,"s","Battleships"],[638,"Raven",50000.0,"s","Battleships"],[24688,"Rokh",50000.0,"s","Battleships"],[640,"Scorpion",50000.0,"s","Battleships"],[639,"Tempest",50000.0,"s","Battleships"],[644,"Typhoon",50000.0,"s","Battleships"],[28352,"Rorqual",1300000.0,"s","Capital Industrial Ships"],[23919,"Aeon",1300000.0,"s","Carriers"],[23757,"Archon",1300000.0,"s","Carriers"],[23915,"Chimera",1300000.0,"s","Carriers"],[22852,"Hel",1300000.0,"s","Carriers"],[24483,"Nidhoggur",1300000.0,"s","Carriers"],[23913,"Nyx",1300000.0,"s","Carriers"],[23911,"Thanatos",1300000.0,"s","Carriers"],[23917,"Wyvern",1300000.0,"s","Carriers"],[628,"Arbitrator",10000.0,"s","Cruisers"],[625,"Augoror",10000.0,"s","Cruisers"],[630,"Bellicose",10000.0,"s","Cruisers"],[632,"Blackbird",10000.0,"s","Cruisers"],[621,"Caracal",10000.0,"s","Cruisers"],[633,"Celestis",10000.0,"s","Cruisers"],[634,"Exequror",10000.0,"s","Cruisers"],[624,"Maller",10000.0,"s","Cruisers"],[623,"Moa",10000.0,"s","Cruisers"],[2006,"Omen",10000.0,"s","Cruisers"],[620,"Osprey",10000.0,"s","Cruisers"],[49712,"Rodiva",10000.0,"s","Cruisers"],[629,"Rupture",10000.0,"s","Cruisers"],[631,"Scythe",10000.0,"s","Cruisers"],[622,"Stabber",10000.0,"s","Cruisers"],[627,"Thorax",10000.0,"s","Cruisers"],[47270,"Vedmak",10000.0,"s","Cruisers"],[626,"Vexor",10000.0,"s","Cruisers"],[32872,"Algos",5000.0,"s","Destroyers"],[16240,"Catalyst",5000.0,"s","Destroyers"],[16236,"Coercer",5000.0,"s","Destroyers"],[32876,"Corax",5000.0,"s","Destroyers"],[16238,"Cormorant",5000.0,"s","Destroyers"],[32874,"Dragoon",5000.0,"s","Destroyers"],[49710,"Kikimora",5000.0,"s","Destroyers"],[89240,"Pioneer",5000.0,"s","Destroyers"],[32878,"Talwar",5000.0,"s","Destroyers"],[16242,"Thrasher",5000.0,"s","Destroyers"],[19724,"Moros",1300000.0,"s","Dreadnoughts"],[19722,"Naglfar",1300000.0,"s","Dreadnoughts"],[19726,"Phoenix",1300000.0,"s","Dreadnoughts"],[19720,"Revelation",1300000.0,"s","Dreadnoughts"],[52907,"Zirnitra",1300000.0,"s","Dreadnoughts"],[37604,"Apostle",1300000.0,"s","Force Auxiliaries"],[37606,"Lif",1300000.0,"s","Force Auxiliaries"],[37605,"Minokawa",1300000.0,"s","Force Auxiliaries"],[37607,"Ninazu",1300000.0,"s","Force Auxiliaries"],[81040,"Avalanche",1300000.0,"s","Freighters"],[34328,"Bowhead",1300000.0,"s","Freighters"],[20185,"Charon",1300000.0,"s","Freighters"],[20189,"Fenrir",1300000.0,"s","Freighters"],[20187,"Obelisk",1300000.0,"s","Freighters"],[20183,"Providence",1300000.0,"s","Freighters"],[608,"Atron",2500.0,"s","Frigates"],[582,"Bantam",2500.0,"s","Frigates"],[598,"Breacher",2500.0,"s","Frigates"],[599,"Burst",2500.0,"s","Frigates"],[583,"Condor",2500.0,"s","Frigates"],[2161,"Crucifier",2500.0,"s","Frigates"],[47269,"Damavik",2500.0,"s","Frigates"],[589,"Executioner",2500.0,"s","Frigates"],[584,"Griffin",2500.0,"s","Frigates"],[605,"Heron",2500.0,"s","Frigates"],[607,"Imicus",2500.0,"s","Frigates"],[594,"Incursus",2500.0,"s","Frigates"],[590,"Inquisitor",2500.0,"s","Frigates"],[602,"Kestrel",2500.0,"s","Frigates"],[29248,"Magnate",2500.0,"s","Frigates"],[609,"Maulus",2500.0,"s","Frigates"],[603,"Merlin",2500.0,"s","Frigates"],[592,"Navitas",2500.0,"s","Frigates"],[586,"Probe",2500.0,"s","Frigates"],[597,"Punisher",2500.0,"s","Frigates"],[587,"Rifter",2500.0,"s","Frigates"],[585,"Slasher",2500.0,"s","Frigates"],[591,"Tormentor",2500.0,"s","Frigates"],[593,"Tristan",2500.0,"s","Frigates"],[32880,"Venture",2500.0,"s","Frigates"],[3766,"Vigil",2500.0,"s","Frigates"],[648,"Badger",20000.0,"s","Haulers and Industrial Ships"],[1944,"Bestower",20000.0,"s","Haulers and Industrial Ships"],[655,"Epithal",20000.0,"s","Haulers and Industrial Ships"],[651,"Hoarder",20000.0,"s","Haulers and Industrial Ships"],[657,"Iteron Mark V",20000.0,"s","Haulers and Industrial Ships"],[654,"Kryos",20000.0,"s","Haulers and Industrial Ships"],[652,"Mammoth",20000.0,"s","Haulers and Industrial Ships"],[656,"Miasmos",20000.0,"s","Haulers and Industrial Ships"],[650,"Nereus",20000.0,"s","Haulers and Industrial Ships"],[2998,"Noctis",20000.0,"s","Haulers and Industrial Ships"],[28606,"Orca",500000.0,"s","Haulers and Industrial Ships"],[42244,"Porpoise",50000.0,"s","Haulers and Industrial Ships"],[19744,"Sigil",20000.0,"s","Haulers and Industrial Ships"],[81008,"Squall",20000.0,"s","Haulers and Industrial Ships"],[649,"Tayra",20000.0,"s","Haulers and Industrial Ships"],[653,"Wreathe",20000.0,"s","Haulers and Industrial Ships"],[17476,"Covetor",3750.0,"s","Mining Barges"],[17480,"Procurer",3750.0,"s","Mining Barges"],[17478,"Retriever",3750.0,"s","Mining Barges"],[11567,"Avatar",10000000.0,"s","Titans"],[671,"Erebus",10000000.0,"s","Titans"],[3764,"Leviathan",10000000.0,"s","Titans"],[23773,"Ragnarok",10000000.0,"s","Titans"]];
+const KIND = {}, GROUP = {};
+for (const [id, name, vol, k, g] of CATALOG) { T[id] = {...(T[id] || {}), name, vol}; KIND[id] = k; GROUP[id] = g; }
+
+const D = {jitaAt:{}, filter:{text:'', kind:'', active:true}, rowMap:new Map(), orders:[], hangar:{}, market:[], byType:{}, jita:{}, hist:{}, tx:[], rows:[], updates:[], updated:null, auto:new Set()};
+let tab = 'market', matsBusy = false;
+const mexp = new Set();
+let busy = false, errRemain = 100, sortKey = 'signal', sortDir = 1;
+const expanded = new Set();
+const alerted = new Set(loadJSON(AKEY, []));
+const cache = new Map();
+
+/* ---------- formatting ---------- */
+function isk(v){ if (v == null || !isFinite(v)) return '–'; const a = Math.abs(v);
+  if (a >= 1e9) return (v/1e9).toFixed(2)+'b'; if (a >= 1e6) return (v/1e6).toFixed(1)+'m';
+  if (a >= 1e3) return (v/1e3).toFixed(1)+'k'; return v.toFixed(2); }
+function price(v){ return v == null ? '–' : v.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function pc(v){ return v == null || !isFinite(v) ? '–' : (v*100).toFixed(1)+'%'; }
+function cls(v){ return v == null ? '' : v >= 0 ? 'pos' : 'neg'; }
+function status(msg, kind=''){ const el = $('#status'); el.hidden = !msg; el.textContent = msg || ''; el.className = 'status ' + kind; }
+
+/* EVE only allows 4 significant digits when changing prices */
+function tick(p){ return p > 0 ? Math.max(0.01, Math.pow(10, Math.floor(Math.log10(p)) - 3)) : 0.01; }
+function undercut(p){ const t = tick(p*(1 - 1e-12)); let n = Math.floor(p/t + 1e-9)*t; if (p - n < t*1e-6) n -= t; return +n.toPrecision(12); }
+function overbid(p){ const t = tick(p); let n = Math.ceil(p/t - 1e-9)*t; if (n - p < t*1e-6) n += t; return +n.toPrecision(12); }
+
+/* ---------- SSO (PKCE, no secret needed) ---------- */
+function b64url(bytes){ let s=''; bytes.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64urlDecode(s){ s = s.replace(/-/g,'+').replace(/_/g,'/'); while (s.length % 4) s += '='; return atob(s); }
+function rand(n){ const a = new Uint8Array(n); crypto.getRandomValues(a); return b64url(a); }
+
+async function login(){
+  if (!S.clientId) { status('Enter your application client ID first.', 'err'); return; }
+  const verifier = rand(32), state = rand(16);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  sessionStorage.setItem('cjdesk:pkce', JSON.stringify({verifier, state}));
+  const p = new URLSearchParams({response_type:'code', redirect_uri:REDIRECT, client_id:S.clientId, scope:SCOPES,
+    code_challenge:b64url(digest), code_challenge_method:'S256', state});
+  location.href = `${SSO}/authorize?${p}`;
+}
+async function handleCallback(){
+  const q = new URLSearchParams(location.search); const code = q.get('code'); if (!code) return;
+  history.replaceState(null, '', REDIRECT);
+  const pk = JSON.parse(sessionStorage.getItem('cjdesk:pkce') || 'null'); sessionStorage.removeItem('cjdesk:pkce');
+  if (!pk || pk.state !== q.get('state')) { status('The login response did not match this session. Log in again.', 'err'); return; }
+  const r = await fetch(`${SSO}/token`, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({grant_type:'authorization_code', code, client_id:S.clientId, code_verifier:pk.verifier})});
+  if (!r.ok) { status(`Login failed (${r.status}). Check that the callback URL on your EVE application is exactly ${REDIRECT}`, 'err'); return; }
+  const id = setTokens(await r.json());
+  status(`Logged in as ${S.chars[id].name}.`, 'ok');
+}
+function setTokens(j){
+  const p = JSON.parse(b64urlDecode(j.access_token.split('.')[1]));
+  const id = Number(String(p.sub).split(':').pop());
+  S.chars[id] = {name:p.name, access:j.access_token, refresh:j.refresh_token, exp:Date.now() + j.expires_in*1000};
+  save(); return id;
+}
+async function token(cid){
+  const c = S.chars[cid]; if (!c) throw new Error('Unknown character');
+  if (Date.now() < c.exp - 60000) return c.access;
+  const r = await fetch(`${SSO}/token`, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({grant_type:'refresh_token', refresh_token:c.refresh, client_id:S.clientId})});
+  if (!r.ok) { c.expired = true; save(); renderChars(); throw new Error(`${c.name}'s login has expired. Use "Add character" to log in again.`); }
+  const j = await r.json(); setTokens(j); return j.access_token;
+}
+
+/* ---------- ESI ---------- */
+async function esi(path, {cid, params={}, method='GET', body}={}){
+  const u = new URL(ESI + path); u.searchParams.set('datasource', 'tranquility');
+  for (const [k,v] of Object.entries(params)) u.searchParams.set(k, v);
+  const key = method + u + (cid || '') + (body ? JSON.stringify(body) : '');
+  const hit = cache.get(key); if (hit && hit.exp > Date.now()) return hit.v;
+  if (errRemain < 15) throw new Error('ESI error limit is nearly used up. Wait a minute, then refresh.');
+  const headers = {Accept:'application/json'};
+  if (cid) headers.Authorization = 'Bearer ' + await token(cid);
+  if (body) headers['Content-Type'] = 'application/json';
+  const r = await fetch(u, {method, headers, body: body ? JSON.stringify(body) : undefined});
+  const rem = r.headers.get('X-ESI-Error-Limit-Remain'); if (rem != null) errRemain = +rem;
+  if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch {}
+    const e = new Error(`ESI ${r.status} on ${path}${m ? ': ' + m : ''}`); e.status = r.status; throw e; }
+  const pagesHdr = r.headers.get('X-Pages');
+  const v = {data: await r.json(), pages: +(pagesHdr || 1), pagesKnown: pagesHdr != null};
+  const ex = r.headers.get('Expires');
+  if (ex && method === 'GET') cache.set(key, {v, exp: Date.parse(ex)});
+  return v;
+}
+async function esiAll(path, opts={}){
+  const P = n => ({...opts, params:{...(opts.params || {}), page:n}});
+  const first = await esi(path, P(1)); let out = first.data.slice();
+  if (first.pagesKnown) {
+    const rest = []; for (let p = 2; p <= first.pages; p++) rest.push(p);
+    const res = await pool(rest, 6, p => esi(path, P(p)));
+    for (const r of res) { if (r && r.error) throw r.error; out = out.concat(r.data); }
+  } else {
+    let p = 2, last = first.data;
+    while (last.length >= 1000) {
+      try { last = (await esi(path, P(p))).data; out = out.concat(last); p++; }
+      catch (e) { if (e.status === 404 || e.status === 400) break; throw e; }
+    }
+  }
+  return out;
+}
+async function pool(items, n, fn){
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({length: Math.min(n, items.length)}, async () => {
+    while (i < items.length) { const k = i++; try { out[k] = await fn(items[k], k); } catch (e) { out[k] = {error:e}; } }
+  }));
+  return out;
+}
+const cids = () => Object.keys(S.chars).map(Number);
+const ready = () => S.clientId && cids().length && S.structure;
+
+/* ---------- structure lookup ---------- */
+async function findStructures(q){
+  const cid = cids()[0];
+  const r = await esi(`/characters/${cid}/search/`, {cid, params:{categories:'structure', search:q, strict:'false'}});
+  const ids = (r.data.structure || []).slice(0, 25);
+  const res = await pool(ids, 5, async id => ({id, ...(await esi(`/universe/structures/${id}/`, {cid})).data}));
+  return res.filter(x => x && !x.error);
+}
+async function pickStructure(s){
+  status('Looking up the structure location…');
+  const sys = (await esi(`/universe/systems/${s.solar_system_id}/`)).data;
+  const con = (await esi(`/universe/constellations/${sys.constellation_id}/`)).data;
+  const reg = (await esi(`/universe/regions/${con.region_id}/`)).data;
+  S.structure = {id:s.id, name:s.name, systemName:sys.name, regionId:con.region_id, regionName:reg.name};
+  save(); status(''); render(); refresh();
+}
+
+/* ---------- data loading ---------- */
+function addHangar(assets){
+  const sid = S.structure.id, by = new Map(assets.map(a => [a.item_id, a]));
+  for (const a of assets) {
+    if (a.is_blueprint_copy) continue;
+    if (by.has(a.location_id) && /Slot|Implant|Skill/.test(a.location_flag)) continue; // fitted to a ship
+    let cur = a, g = 0; while (by.has(cur.location_id) && g++ < 8) cur = by.get(cur.location_id);
+    if (cur.location_id === sid) D.hangar[a.type_id] = (D.hangar[a.type_id] || 0) + a.quantity;
+  }
+}
+async function structureMarket(){
+  let last;
+  for (const cid of cids()) { try { return await esiAll(`/markets/structures/${S.structure.id}/`, {cid}); } catch (e) { last = e; } }
+  throw new Error(`Could not read the ${S.structure.name} market (${last?.message}). A character needs docking access there.`);
+}
+function watchList(){
+  D.auto = new Set();
+  return CATALOG.map(c => c[0]).filter(t => !S.hidden.includes(t));
+}
+async function loadTypes(ids){
+  await pool(ids, 6, async id => { const t = (await esi(`/universe/types/${id}/`)).data; T[id] = {name:t.name, vol:t.packaged_volume ?? t.volume}; });
+  save();
+}
+
+async function loadJita(tid){
+  const jo = await esiAll(`/markets/${JITA_REGION}/orders/`, {params:{type_id:tid, order_type:'all'}});
+  const at = jo.filter(o => o.location_id === JITA_4_4);
+  const s = at.filter(o => !o.is_buy_order).map(o => o.price), b = at.filter(o => o.is_buy_order).map(o => o.price);
+  D.jitaAt[tid] = Date.now();
+  D.jita[tid] = {sell: s.length ? Math.min(...s) : null, buy: b.length ? Math.max(...b) : null};
+}
+async function refresh(){
+  if (busy || !ready()) return;
+  busy = true; $('#btnRefresh').disabled = true; const errs = [];
+  try {
+    const ids = cids().filter(c => !S.chars[c].expired);
+    if (!ids.length) throw new Error('All character logins have expired. Use "Add character" to log in again.');
+    status('Loading orders, assets and wallet transactions…');
+    const per = await pool(ids, 3, async cid => {
+      const [o, a, t] = await Promise.all([
+        esi(`/characters/${cid}/orders/`, {cid}).then(r => r.data),
+        esiAll(`/characters/${cid}/assets/`, {cid}),
+        esi(`/characters/${cid}/wallet/transactions/`, {cid}).then(r => r.data)]);
+      return {cid, o, a, t};
+    });
+    D.orders = []; D.tx = []; D.hangar = {};
+    per.forEach((r, i) => {
+      if (r?.error) { errs.push(`${S.chars[ids[i]].name}: ${r.error.message}`); return; }
+      D.orders.push(...r.o.map(o => ({...o, cid:r.cid}))); D.tx.push(...r.t); addHangar(r.a);
+    });
+    status(`Loading the ${S.structure.name} market…`);
+    D.market = await structureMarket();
+    const watch = watchList();
+    const need = watch.filter(t => !T[t]); if (need.length) await loadTypes(need);
+    status(`Loading Jita prices and ${S.structure.regionName} history for ${watch.length} items. The first load takes a minute or two…`);
+    const res = await pool(watch, 8, async tid => {
+      const [, hi] = await Promise.all([D.jitaAt[tid] > Date.now() - 30*60*1000 ? null : loadJita(tid),
+        esi(`/markets/${S.structure.regionId}/history/`, {params:{type_id:tid}}).then(r => r.data).catch(() => [])]);
+      D.hist[tid] = hi;
+    });
+    res.forEach((r, i) => r?.error && errs.push(`${T[watch[i]]?.name || watch[i]}: ${r.error.message}`));
+    D.updated = new Date(); D.watch = watch;
+    compute(); renderDesk(); notifyNew();
+    status(errs.length ? `Updated, with ${errs.length} problem${errs.length > 1 ? 's' : ''}: ${errs.slice(0,3).join('; ')}` : '', errs.length ? 'err' : '');
+  } catch (e) { status(e.message, 'err'); }
+  finally { busy = false; $('#btnRefresh').disabled = false; }
+  if (tab === 'mats' && D.updated) { D.matsLoaded = false; loadMaterials(); }
+}
+
+/* ---------- material cost ---------- */
+async function loadBlueprintData(){
+  if (D.bp) return true;
+  const MIRROR = 'https://raw.githubusercontent.com/cjkilman/eve-sde-dump/main/';
+  const get = async f => { const r = await fetch(f, {cache:'no-cache'}); if (!r.ok) throw new Error(f); return r.text(); };
+  const both = base => Promise.all([get(base + 'industryActivityMaterials.csv'), get(base + 'industryActivityProducts.csv')]);
+  let mt, pt;
+  try { [mt, pt] = await both(''); }                 // local copies next to this page win, if present
+  catch {
+    try { status('Downloading blueprint data…'); [mt, pt] = await both(MIRROR); }
+    catch { D.bpMissing = true; return false; }
+  }
+  const parse = (txt, cols) => { const lines = txt.split(/\r?\n/), h = lines[0].split(',').map(x => x.trim());
+    const ix = cols.map(c => h.indexOf(c)); if (ix.some(i => i < 0)) throw new Error('Unexpected CSV format');
+    return lines.slice(1).filter(Boolean).map(l => { const f = l.split(','); return ix.map(i => +f[i]); }); };
+  const mats = {}, prod = {};
+  for (const [bp, act, mat, q] of parse(mt, ['typeID','activityID','materialTypeID','quantity']))
+    if (act === 1 || act === 11) (mats[bp + ':' + act] ??= []).push({id:mat, q});
+  for (const [bp, act, product, q] of parse(pt, ['typeID','activityID','productTypeID','quantity']))
+    if ((act === 1 || act === 11) && !(prod[product]?.act === 1)) prod[product] = {bp, act, units:q};
+  D.bp = {mats, prod}; D.bpMissing = false; return true;
+}
+function recipe(tid){
+  const name = T[tid]?.name || '';
+  if (/ Blueprint$| Reaction Formula$/.test(name)) return null;
+  const p = D.bp.prod[tid]; if (!p) return null;
+  const base = D.bp.mats[p.bp + ':' + p.act]; if (!base) return null;
+  const me = p.act === 1 ? S.settings.me : 0;
+  return {units: p.units || 1, mats: base.map(m => ({id:m.id, q: Math.max(1, Math.ceil(+(m.q*(1 - me/100)).toFixed(2)))}))};
+}
+async function loadMaterials(){
+  if (matsBusy || !D.updated) return;
+  matsBusy = true; const errs = []; renderMats();
+  try {
+    status('Reading blueprint data…');
+    if (!await loadBlueprintData()) { status(''); return; }
+    const matIds = [...new Set((D.watch || []).flatMap(t => (recipe(t)?.mats || []).map(m => m.id)))];
+    const missing = matIds.filter(t => !T[t]); if (missing.length) await loadTypes(missing);
+    status(`Loading Jita prices for ${matIds.length} materials…`);
+    const pr = await pool(matIds.filter(t => !(D.jitaAt[t] > Date.now() - 30*60*1000)), 8, loadJita);
+    pr.forEach((r, i) => r?.error && errs.push(`${T[matIds[i]]?.name || matIds[i]}: ${r.error.message}`));
+    D.matsLoaded = true;
+    status(errs.length ? `Material costs loaded, with ${errs.length} problem${errs.length > 1 ? 's' : ''}: ${errs.slice(0,3).join('; ')}` : '', errs.length ? 'err' : '');
+  } catch (e) { status(e.message, 'err'); }
+  finally { matsBusy = false; renderMats(); }
+}
+function matRows(){
+  const st = S.settings, fr = st.freightPerM3, col = st.collateralPct/100;
+  return (D.watch || []).map(tid => {
+    const t = T[tid] || {}, sell = D.rowMap.get(tid)?.compSell ?? D.byType[tid]?.sell[0]?.price ?? null;
+    const jitaPrice = D.jita[tid]?.sell ?? null;
+    const base = {tid, name: t.name || `Type ${tid}`, sell, jitaPrice};
+    if (!D.matsLoaded || !D.bp) return {...base, state:'loading'};
+    const rc = recipe(tid);
+    if (!rc) return {...base, state:'none'};
+    const u = rc.units;
+    let jita = 0, landed = 0, local = 0, mix = 0, missJ = 0, missL = 0, incomplete = false;
+    const lines = rc.mats.map(m => {
+      const q = m.q/u, js = D.jita[m.id]?.sell ?? null, ls = D.byType[m.id]?.sell[0]?.price ?? null, v = T[m.id]?.vol ?? 0;
+      const ld = js != null ? js + (fr != null ? v*fr + js*col : 0) : null;
+      const opts = [ld, ls].filter(x => x != null), b = opts.length ? Math.min(...opts) : null;
+      if (js == null) missJ++; else { jita += q*js; landed += q*ld; }
+      if (ls == null) missL++; else local += q*ls;
+      if (b == null) incomplete = true; else mix += q*b;
+      return {id:m.id, q, js, ld, ls, src: b == null ? null : b === ls ? 'local' : 'jita'};
+    });
+    const best = incomplete ? null : mix;
+    return {...base, state:'ok', lines, jita: missJ ? null : jita, landed: missJ || fr == null ? null : landed,
+      local: missL ? null : local, missL, mix: best, markup: sell && best ? (sell - best)/best : null,
+      jitaPrice, jitaMarkup: jitaPrice && jita && !missJ ? (jitaPrice - jita)/jita : null};
+  });
+}
+function renderMats(){
+  if (!S.structure) return;
+  const here = esc(S.structure.systemName), st = S.settings;
+  if (D.bpMissing) {
+    $('#mtbl thead').innerHTML = '';
+    $('#mtbl tbody').innerHTML = `<tr><td style="text-align:left;white-space:normal;padding:16px"><h3 style="margin:0 0 8px">Add the blueprint data files</h3>
+      <p>The page couldn't download CCP's blueprint data. Download these two files into the same folder as this page (keep the file names as they are), then click Retry:</p>
+      <p><a href="https://raw.githubusercontent.com/cjkilman/eve-sde-dump/main/industryActivityMaterials.csv">industryActivityMaterials.csv</a><br>
+      <a href="https://raw.githubusercontent.com/cjkilman/eve-sde-dump/main/industryActivityProducts.csv">industryActivityProducts.csv</a></p>
+      <p class="muted">The same files are also in the csv folder of Fuzzwork's latest SDE dump.</p>
+      <button id="btnRetryMats" class="primary">Retry</button></td></tr>`;
+    $('#matsFoot').textContent = ''; return;
+  }
+  const key = r => r.state !== 'ok' ? -Infinity : (r.markup ?? r.jitaMarkup ?? -1e9);
+  const rows = matRows().filter(m => passes(m.tid)).sort((a, b) => key(b) - key(a) || a.name.localeCompare(b.name));
+  $('#mtbl thead').innerHTML = `<tr><th>Item</th><th>Price in ${here}</th><th>Price in Jita</th><th>Materials at Jita</th><th>Landed at ${here}</th><th>Materials at ${here}</th><th>Cheapest mix</th><th>${here} vs materials</th><th>Jita vs Jita materials</th></tr>`;
+  const qty = q => q >= 100 ? Math.round(q).toLocaleString() : (+q.toFixed(2)).toLocaleString();
+  $('#mtbl tbody').innerHTML = rows.length ? rows.map(r => {
+    if (r.state !== 'ok') return `<tr><td>${esc(r.name)}</td><td>${isk(r.sell)}</td><td>${isk(r.jitaPrice)}</td><td colspan="6" class="muted" style="text-align:left">${r.state === 'none' ? 'No manufacturing recipe (faction, deadspace or a blueprint itself)' : matsBusy ? 'Loading…' : 'Open this tab after a refresh to load'}</td></tr>`;
+    const main = `<tr class="mitem item" data-mtid="${r.tid}" tabindex="0" aria-expanded="${mexp.has(r.tid)}"><td>${esc(r.name)}</td><td>${isk(r.sell)}</td><td>${isk(r.jitaPrice)}</td><td>${isk(r.jita)}</td>
+      <td>${r.landed != null ? isk(r.landed) : st.freightPerM3 == null ? '<span class="muted">set freight</span>' : '–'}</td>
+      <td>${r.local != null ? isk(r.local) : `<span class="muted">${r.missL} not listed</span>`}</td><td>${isk(r.mix)}</td>
+      <td><span class="${cls(r.markup)}">${r.markup != null ? (r.markup >= 0 ? '+' : '') + pc(r.markup) : '–'}</span></td>
+      <td><span class="${cls(r.jitaMarkup)}">${r.jitaMarkup != null ? (r.jitaMarkup >= 0 ? '+' : '') + pc(r.jitaMarkup) : '–'}</span></td></tr>`;
+    if (!mexp.has(r.tid)) return main;
+    return main + `<tr class="detailrow"><td colspan="9"><table class="mats"><tr><th>Material</th><th>Qty per unit</th><th>Jita</th><th>Landed</th><th>${here}</th><th>Cheaper at</th></tr>
+      ${r.lines.map(l => `<tr><td>${esc(T[l.id]?.name || l.id)}</td><td>${qty(l.q)}</td><td>${isk(l.js)}</td><td>${st.freightPerM3 != null ? isk(l.ld) : '–'}</td><td>${isk(l.ls)}</td>
+        <td>${l.src === 'local' ? here : l.src === 'jita' ? 'Jita' : '<span class="muted">no sellers</span>'}</td></tr>`).join('')}</table></td></tr>`;
+  }).join('') : '<tr><td colspan="9" class="empty" style="text-align:left">No items match the filters.</td></tr>';
+  $('#matsFoot').textContent = `Material quantities are for one unit from an ME ${st.me} blueprint, from CCP's static data. Prices use the cheapest sell order; "Landed" adds your freight rate and collateral fee to Jita prices, and the cheapest mix picks the better source per material. Job install costs are not included. Prices are the cheapest sell order in each market. A price below material cost usually means sellers are dumping; a large markup means builders have room to undercut. Click a row for the per-material breakdown.`;
+}
+
+/* ---------- analysis ---------- */
+function wavg(list){ const v = list.reduce((s,d) => s + d.volume, 0); return v ? list.reduce((s,d) => s + d.average*d.volume, 0)/v : null; }
+function histStats(hist, p, days){
+  if (!hist?.length) return {pct:null, avg30:null, vol30:0, trend:null, series:[]};
+  const now = Date.now(), age = d => (now - Date.parse(d.date))/864e5;
+  const win = hist.filter(d => age(d) <= days), l30 = hist.filter(d => age(d) <= 30), l7 = hist.filter(d => age(d) <= 7);
+  const avg30 = wavg(l30), avg7 = wavg(l7);
+  return {
+    pct: p != null && win.length ? win.filter(d => d.average < p).length / win.length * 100 : null,
+    avg30, vol30: l30.reduce((s,d) => s + d.volume, 0)/30,
+    trend: avg7 && avg30 ? (avg7 - avg30)/avg30 : null,
+    series: win.sort((a,b) => a.date < b.date ? -1 : 1)
+  };
+}
+function costBasis(tid, qty){
+  const buys = D.tx.filter(t => t.type_id === tid && t.is_buy).sort((a,b) => Date.parse(b.date) - Date.parse(a.date));
+  if (!buys.length) return null;
+  const need = qty > 0 ? qty : Infinity; let q = 0, v = 0;
+  for (const b of buys) { const take = Math.min(b.quantity, need - q); q += take; v += take*b.unit_price; if (q >= need) break; }
+  return q ? v/q : null;
+}
+const RANK = {update:0, sell:1, buy:2, import:3, hold:4, watch:5};
+function compute(){
+  const st = S.settings, sid = S.structure.id;
+  const broker = st.brokerFee/100, tax = st.salesTax/100, target = st.targetMargin/100, keep = 1 - broker - tax;
+  const myIds = new Set(D.orders.map(o => o.order_id));
+  const byType = {};
+  for (const o of D.market) (byType[o.type_id] ??= {buy:[], sell:[]})[o.is_buy_order ? 'buy' : 'sell'].push(o);
+  for (const k in byType) { byType[k].sell.sort((a,b) => a.price - b.price); byType[k].buy.sort((a,b) => b.price - a.price); }
+  D.byType = byType; D.myIds = myIds;
+  const myHere = D.orders.filter(o => o.location_id === sid);
+  const rows = [], updates = [];
+
+  for (const tid of D.watch || []) {
+    const m = byType[tid] || {buy:[], sell:[]};
+    const others = list => list.filter(o => !myIds.has(o.order_id));
+    const compSell = others(m.sell)[0]?.price ?? null, compBuy = others(m.buy)[0]?.price ?? null;
+    const supply = others(m.sell).reduce((s,o) => s + o.volume_remain, 0);
+    const mine = myHere.filter(o => o.type_id === tid);
+    const onSale = mine.filter(o => !o.is_buy_order).reduce((s,o) => s + o.volume_remain, 0);
+    const onBuy = mine.filter(o => o.is_buy_order).reduce((s,o) => s + o.volume_remain, 0);
+    const hangar = D.hangar[tid] || 0;
+    const h = histStats(D.hist[tid], compSell, st.historyDays);
+    const costAuto = costBasis(tid, hangar + onSale);
+    const cost = S.costOverrides[tid] ?? costAuto;
+    const listAt = compSell != null ? undercut(compSell) : h.avg30;
+    const net = listAt != null ? listAt*keep : null;
+    const margin = net != null && cost ? (net - cost)/cost : null;
+    const exitRef = h.avg30 ?? listAt;
+    const j = D.jita[tid] || {}, vol = T[tid]?.vol;
+    let importCost = null, importMargin = null;
+    if (j.sell != null && st.freightPerM3 != null && vol != null) {
+      importCost = j.sell + vol*st.freightPerM3 + j.sell*st.collateralPct/100;
+      if (net != null) importMargin = (net - importCost)/importCost;
+    }
+    const bidAt = compBuy != null ? overbid(compBuy) : null;
+    const flipMargin = bidAt && exitRef ? (exitRef*keep - bidAt*(1 + broker))/(bidAt*(1 + broker)) : null;
+    const snipeMargin = compSell && exitRef ? (exitRef*keep - compSell)/compSell : null;
+    const daysStock = h.vol30 > 0 ? supply/h.vol30 : null;
+
+    const sig = [];
+    for (const o of mine) {
+      if (!o.is_buy_order && compSell != null && compSell < o.price) {
+        const s = undercut(compSell);
+        updates.push({tid, o, comp:compSell, suggest:s, warn: cost && s*keep < cost ? 'That price is below your cost after fees.' : ''});
+      }
+      if (o.is_buy_order && compBuy != null && compBuy > o.price) {
+        const s = overbid(compBuy), fm = exitRef ? (exitRef*keep - s*(1 + broker))/(s*(1 + broker)) : null;
+        updates.push({tid, o, comp:compBuy, suggest:s, warn: fm != null && fm < target ? `At that price the flip margin drops to ${pc(fm)}.` : ''});
+      }
+    }
+    if (updates.some(u => u.tid === tid)) sig.push({k:'update'});
+    if (hangar > 0) {
+      if (margin != null && margin >= target && (h.pct == null || h.pct >= st.highPct))
+        sig.push({k:'sell', why: h.pct == null ? `${pc(margin)} over cost.` : `Price is at the ${Math.round(h.pct)}th percentile of ${st.historyDays} days, ${pc(margin)} over cost.`});
+      else if (cost == null && h.pct != null && h.pct >= st.highPct)
+        sig.push({k:'sell', why:`Price is at the ${Math.round(h.pct)}th percentile of ${st.historyDays} days. Set your cost to check the margin.`});
+      else
+        sig.push({k:'hold', why: margin != null && margin < target ? `Only ${pc(margin)} over cost after fees.` : h.pct != null ? `Price is at the ${Math.round(h.pct)}th percentile; waiting for the top ${100 - st.highPct}%.` : ''});
+    }
+    if (h.vol30 > 0) {
+      if (snipeMargin != null && snipeMargin >= target && h.pct != null && h.pct <= st.lowPct)
+        sig.push({k:'buy', how:'snipe', why:`Cheapest sell order is at the ${Math.round(h.pct)}th percentile. Reselling at the 30-day average nets ${pc(snipeMargin)}.`});
+      else if (flipMargin != null && flipMargin >= target && !onBuy)
+        sig.push({k:'buy', how:'bid', why:`A buy order at ${price(bidAt)} nets ${pc(flipMargin)} if resold at the 30-day average.`});
+    }
+    if (importMargin != null && importMargin >= target)
+      sig.push({k:'import', why:`Jita sell plus freight is ${isk(importCost)}; listing here nets ${pc(importMargin)}.`});
+    if (!sig.length) sig.push({k:'watch'});
+    sig.sort((a,b) => RANK[a.k] - RANK[b.k]);
+
+    rows.push({tid, name:T[tid]?.name || `Type ${tid}`, auto: D.auto.has(tid) && !S.watch.includes(tid),
+      hangar, onSale, onBuy, cost, costAuto, compSell, compBuy, supply, h, margin, j, importCost, importMargin,
+      bidAt, flipMargin, daysStock, sig, signal:sig[0].k});
+  }
+  D.rows = rows; D.updates = updates; D.rowMap = new Map(rows.map(r => [r.tid, r]));
+}
+
+/* ---------- rendering ---------- */
+function passes(tid){
+  const f = D.filter, r = D.rowMap.get(tid);
+  if (f.kind && KIND[tid] !== f.kind) return false;
+  if (f.text && !`${T[tid]?.name || ''} ${GROUP[tid] || ''}`.toLowerCase().includes(f.text)) return false;
+  if (f.active && !(r && (r.compSell != null || r.h.vol30 > 0 || r.hangar || r.onSale || r.onBuy))) return false;
+  return true;
+}
+function render(){
+  renderChars();
+  $('#title').textContent = S.structure ? `${S.structure.systemName} trading desk` : 'Trading desk';
+  $('#where').textContent = S.structure ? `${S.structure.name}, ${S.structure.regionName}` : '';
+  const isReady = ready();
+  $('#setup').hidden = isReady; $('#desk').hidden = !isReady; $('#btnRefresh').hidden = !isReady;
+  if (!isReady) renderSetup(); else renderDesk();
+}
+function renderChars(){
+  $('#chars').innerHTML = cids().map(c => `<span class="chip ${S.chars[c].expired ? 'expired' : ''}">${esc(S.chars[c].name)}${S.chars[c].expired ? ' (log in again)' : ''}</span>`).join('')
+    + (S.clientId ? '<button id="btnAddChar">Add character</button>' : '');
+}
+function renderSetup(){
+  const el = $('#setup');
+  if (!/^https?:$/.test(location.protocol) || location.origin === 'null') {
+    el.innerHTML = `<h2>Run this page from a local web server</h2>
+      <p>EVE's login can only send you back to a web address, so this page won't work inside a preview window or when opened as a file. Download it first. In a terminal, go to the folder with this file and run:</p>
+      <p><code>python -m http.server 8080</code></p>
+      <p>Then open <code>http://localhost:8080/cj6mt-trading-desk.html</code> in your browser.</p>`;
+    return;
+  }
+  if (!S.clientId) {
+    el.innerHTML = `<h2>Connect to EVE</h2>
+      <p>This page talks to ESI directly from your browser, so it needs its own EVE application. It takes about two minutes and nothing is shared with anyone else.</p>
+      <ol>
+        <li>Go to <a href="https://developers.eveonline.com/" target="_blank" rel="noopener">developers.eveonline.com</a>, log in and create a new application.</li>
+        <li>Set the callback URL to exactly <code>${esc(REDIRECT)}</code></li>
+        <li>Add these scopes: <code>${SCOPES.split(' ').join('</code> <code>')}</code></li>
+        <li>Copy the application's client ID and paste it below. You won't need the secret key.</li>
+      </ol>
+      <div class="row"><input id="inClient" placeholder="Client ID" size="36" aria-label="Client ID"><button class="primary" id="btnSaveClient">Save client ID</button></div>`;
+    return;
+  }
+  if (!cids().length) {
+    el.innerHTML = `<h2>Log in</h2><p>Log in with a character that can dock at your market structure. You can add alts afterwards; their orders and assets are combined.</p>
+      <p class="muted">The callback URL on your EVE application must be exactly <code>${esc(REDIRECT)}</code>. If it isn't, change it on the developer site or use "Clear all saved data" in Settings to start over.</p>
+      <div class="row"><button class="primary" id="btnLogin">Log in with EVE</button></div>`;
+    return;
+  }
+  el.innerHTML = `<h2>Choose your market</h2><p>Search for the structure by name. Only structures your character can see will show up.</p>
+    <div class="row"><input id="inStruct" value="C-J6MT" aria-label="Structure name"><button class="primary" id="btnFind">Find structure</button></div>
+    <div class="results" id="results"></div>`;
+}
+
+const COLS = [
+  {k:'name', l:'Item', v:r => r.name, f:r => `${esc(r.name)}${r.auto ? '<span class="auto">auto</span>' : ''}`},
+  {k:'group', l:'Group', v:r => GROUP[r.tid] || '', f:r => `<span class="muted">${esc(GROUP[r.tid] || '')}</span>`},
+  {k:'hangar', l:'Hangar', v:r => r.hangar, f:r => r.hangar || ''},
+  {k:'onSale', l:'Listed', v:r => r.onSale, f:r => (r.onSale || '') + (r.onBuy ? ` <span class="muted">+${r.onBuy} bid</span>` : '')},
+  {k:'cost', l:'Your cost', v:r => r.cost, f:r => isk(r.cost)},
+  {k:'compSell', l:'Local sell', v:r => r.compSell, f:r => isk(r.compSell)},
+  {k:'compBuy', l:'Local buy', v:r => r.compBuy, f:r => isk(r.compBuy)},
+  {k:'jitaSell', l:'Jita sell', v:r => r.j.sell, f:r => isk(r.j.sell)},
+  {k:'pct', l:'Vs history', v:r => r.h.pct, f:r => r.h.pct == null ? '–' :
+    `<span class="bar" style="--lo:${S.settings.lowPct}%;--hi:${S.settings.highPct}%"><i style="left:${r.h.pct}%"></i></span>${Math.round(r.h.pct)}`},
+  {k:'avg30', l:'30d avg', v:r => r.h.avg30, f:r => isk(r.h.avg30) + (r.h.trend != null ? ` <span class="${cls(r.h.trend)}">${r.h.trend >= 0 ? '+' : ''}${(r.h.trend*100).toFixed(0)}%</span>` : '')},
+  {k:'vol', l:'Sold/day', v:r => r.h.vol30, f:r => r.h.vol30 ? r.h.vol30.toFixed(1) : '–'},
+  {k:'days', l:'Days of stock', v:r => r.daysStock, f:r => r.daysStock == null ? '–' : r.daysStock.toFixed(0)},
+  {k:'margin', l:'Margin', v:r => r.margin, f:r => `<span class="${cls(r.margin)}">${pc(r.margin)}</span>`},
+  {k:'import', l:'Import cost', v:r => r.importCost, f:r => r.importCost != null ? isk(r.importCost) : (r.j.sell != null && S.settings.freightPerM3 == null ? '<span class="muted">set freight</span>' : '–')},
+  {k:'importMargin', l:'Import margin', v:r => r.importMargin, f:r => `<span class="${cls(r.importMargin)}">${pc(r.importMargin)}</span>`},
+  {k:'signal', l:'Signal', v:r => RANK[r.signal], f:r => `<span class="badge b-${r.signal}">${r.signal[0].toUpperCase() + r.signal.slice(1)}</span>`}
+];
+
+function renderDesk(){
+  const u = $('#updated'); u.textContent = D.updated ? `Updated ${D.updated.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
+  if (!D.updated) { $('#tbl tbody').innerHTML = ''; return; }
+  const nm = t => esc(T[t]?.name || t);
+  $('#cUpd').textContent = D.updates.length || '';
+  $('#lUpd').innerHTML = D.updates.length ? D.updates.map(x => `<article class="card">
+      <h3>${nm(x.tid)}</h3>
+      <p>${x.o.is_buy_order ? 'Buy' : 'Sell'} order (${esc(S.chars[x.o.cid]?.name)}), ${x.o.volume_remain} left at ${isk(x.o.price)}. ${x.o.is_buy_order ? 'Outbid' : 'Undercut'} at ${isk(x.comp)}.</p>
+      <p>${x.o.is_buy_order ? 'Raise' : 'Lower'} to <button class="copy" data-copy="${x.suggest}" title="Copy price">${price(x.suggest)}</button></p>
+      ${x.warn ? `<p class="warn">${esc(x.warn)}</p>` : ''}</article>`).join('') : '<p class="empty">All your orders here are on top.</p>';
+
+  const sells = D.rows.filter(r => passes(r.tid) && r.sig.some(s => s.k === 'sell'));
+  $('#cSell').textContent = sells.length || '';
+  $('#lSell').innerHTML = sells.length ? sells.map(r => { const s = r.sig.find(x => x.k === 'sell');
+    return `<article class="card"><h3>${esc(r.name)}</h3><p>${r.hangar} in hangar. ${esc(s.why)}</p>
+      <p>List at <button class="copy" data-copy="${undercut(r.compSell ?? r.h.avg30 ?? 0)}" title="Copy price">${price(r.compSell != null ? undercut(r.compSell) : r.h.avg30)}</button></p></article>`; }).join('')
+    : '<p class="empty">Nothing in your hangar is at a good selling price right now.</p>';
+
+  const buys = D.rows.filter(r => passes(r.tid) && r.sig.some(s => s.k === 'buy' || s.k === 'import'));
+  $('#cBuy').textContent = buys.length || '';
+  $('#lBuy').innerHTML = buys.length ? buys.map(r => r.sig.filter(s => s.k === 'buy' || s.k === 'import').map(s =>
+    `<article class="card"><h3>${esc(r.name)} <span class="badge b-${s.k}">${s.k === 'import' ? 'Import' : s.how === 'bid' ? 'Bid' : 'Buy'}</span></h3><p>${esc(s.why)}</p>
+     ${s.how === 'bid' ? `<p>Bid at <button class="copy" data-copy="${r.bidAt}" title="Copy price">${price(r.bidAt)}</button></p>` : ''}
+     ${r.daysStock != null ? `<p class="muted">${r.daysStock.toFixed(0)} days of stock listed at ${r.h.vol30.toFixed(1)} sold per day.</p>` : ''}</article>`).join('')).join('')
+    : '<p class="empty">No buys meet your target margin right now.</p>';
+
+  const col = COLS.find(c => c.k === sortKey) || COLS[COLS.length - 1];
+  const rows = D.rows.filter(r => passes(r.tid)).sort((a,b) => {
+     const x = col.v(a), y = col.v(b);
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === 'string' ? x.localeCompare(y) : x - y)*sortDir; });
+  $('#shown').textContent = `Showing ${rows.length} of ${D.rows.length}`;
+  $('#tbl thead').innerHTML = '<tr>' + COLS.map(c => `<th data-sort="${c.k}" class="${c.k === sortKey ? 'sorted' : ''}">${c.l}${c.k === sortKey ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('') + '</tr>';
+  $('#tbl tbody').innerHTML = rows.length ? rows.map(r => `<tr class="item" data-tid="${r.tid}" tabindex="0" aria-expanded="${expanded.has(r.tid)}">${COLS.map(c => `<td>${c.f(r)}</td>`).join('')}</tr>`
+    + (expanded.has(r.tid) ? `<tr class="detailrow"><td colspan="${COLS.length}">${detail(r)}</td></tr>` : '')).join('')
+    : `<tr><td colspan="${COLS.length}" class="empty" style="text-align:left">No items match the filters.</td></tr>`;
+}
+
+function spark(series, marks){
+  if (!series.length) return '<p class="muted">No trades in this region during the history window.</p>';
+  const W = 640, H = 150, P = 8;
+  const vals = series.map(d => d.average).concat(marks.filter(m => m.v != null).map(m => m.v));
+  const lo = Math.min(...vals), hi = Math.max(...vals), xs = series.map(d => Date.parse(d.date));
+  const x = t => P + (t - xs[0])/Math.max(1, xs[xs.length - 1] - xs[0])*(W - 2*P);
+  const y = v => H - P - (v - lo)/Math.max(1e-9, hi - lo)*(H - 2*P - 14);
+  const vmax = Math.max(...series.map(d => d.volume), 1);
+  const bars = series.map(d => { const bh = d.volume/vmax*28; return `<rect x="${x(Date.parse(d.date)) - 1.5}" y="${H - P - bh}" width="3" height="${bh}" fill="var(--line)"/>`; }).join('');
+  const line = series.map((d,i) => `${i ? 'L' : 'M'}${x(Date.parse(d.date)).toFixed(1)},${y(d.average).toFixed(1)}`).join('');
+  const mk = marks.filter(m => m.v != null).map(m => `<line x1="${P}" x2="${W - P}" y1="${y(m.v)}" y2="${y(m.v)}" stroke="${m.c}" stroke-dasharray="4 4"/>
+    <text x="${W - P}" y="${y(m.v) - 4}" text-anchor="end" fill="${m.c}" font-size="12">${m.l} ${isk(m.v)}</text>`).join('');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily average price">${bars}<path d="${line}" fill="none" stroke="var(--text)" stroke-width="1.6"/>${mk}
+    <text x="${P}" y="14" fill="var(--muted)" font-size="12">${isk(hi)}</text><text x="${P}" y="${H - P - 32}" fill="var(--muted)" font-size="12">${isk(lo)}</text></svg>`;
+}
+function detail(r){
+  const m = D.byType[r.tid] || {sell:[], buy:[]};
+  const book = list => list.length ? '<table>' + list.slice(0, 6).map(o => `<tr class="${D.myIds.has(o.order_id) ? 'mine' : ''}"><td>${price(o.price)}</td><td>${o.volume_remain}</td></tr>`).join('') + '</table>' : '<p class="muted">None</p>';
+  return `<div class="detail">
+    <div><h4>Daily average, ${esc(S.structure.regionName)}, last ${S.settings.historyDays} days</h4>
+      ${spark(r.h.series, [{v:r.cost, l:'Your cost', c:'var(--amber)'}, {v:r.compSell, l:'Best sell', c:'var(--teal)'}])}</div>
+    <div><h4>Sell orders here</h4>${book(m.sell)}</div>
+    <div><h4>Buy orders here</h4>${book(m.buy)}<p class="muted" style="margin-top:8px">Your orders are in amber.</p></div>
+    <div><h4>Your position</h4>
+      <label>Cost per unit (ISK)<input type="number" min="0" step="any" data-cost="${r.tid}" value="${S.costOverrides[r.tid] ?? ''}" placeholder="${r.costAuto ? Math.round(r.costAuto) : 'Enter your cost'}"></label>
+      <p class="muted">${S.costOverrides[r.tid] != null ? 'Using the cost you entered. Clear the field to use wallet history.' : r.costAuto ? 'Taken from your most recent buys in the wallet (ESI keeps about 30 days).' : 'No recent buys in your wallet history, so enter a cost to see margins.'}</p>
+      <p>Jita: sell ${isk(r.j.sell)}, buy ${isk(r.j.buy)}. Packaged volume ${T[r.tid]?.vol?.toLocaleString() ?? '–'} m³.</p>
+      <button data-unwatch="${r.tid}">Stop watching</button></div></div>`;
+}
+
+function renderSettings(){
+  const st = S.settings;
+  const num = (k, l, hint='') => `<label>${l}<input type="number" step="any" data-set="${k}" value="${st[k] ?? ''}"></label>${hint ? `<p class="hint">${hint}</p>` : ''}`;
+  const chk = (k, l) => `<label>${l}<input type="checkbox" data-set="${k}" ${st[k] ? 'checked' : ''}></label>`;
+  $('#settings').innerHTML = `<h2>Settings <button id="btnClose">Close</button></h2>
+    <h3>Fees</h3>
+    ${num('brokerFee', 'Broker fee (%)', 'Structure owners set this. Check it in the in-game market window at your structure.')}
+    ${num('salesTax', 'Sales tax (%)', 'Depends on your Accounting skill. The in-game market window shows your current rate.')}
+    <h3>Freight from Jita</h3>
+    ${num('freightPerM3', 'Rate (ISK per m³)', 'Leave empty to hide import costs.')}
+    ${num('collateralPct', 'Collateral fee (%)')}
+    <h3>Signals</h3>
+    ${num('targetMargin', 'Target margin after fees (%)')}
+    ${num('lowPct', 'Buy below this percentile', 'Compared with daily average prices over the history window.')}
+    ${num('highPct', 'Sell above this percentile')}
+    ${num('historyDays', 'History window (days)')}
+    <h3>Material cost</h3>
+    ${num('me', 'Blueprint ME level (0 to 10)', 'Most items on the market are built from fully researched blueprints, so 10 is a reasonable default.')}
+    <h3>Refreshing</h3>
+    ${chk('autoRefresh', 'Refresh every 5 minutes')}
+    ${chk('notify', 'Desktop notification when an order needs updating')}
+    <h3>Connection</h3>
+    <label>Client ID<input type="text" id="inClient2" value="${esc(S.clientId)}"></label>
+    <p class="hint">Callback URL: ${esc(REDIRECT)}</p>
+    <p>${S.structure ? `Market: ${esc(S.structure.name)}` : 'No market chosen.'}</p>
+    <div class="row"><button id="btnChangeStruct">Change market</button>
+    ${cids().map(c => `<button data-remove="${c}">Remove ${esc(S.chars[c].name)}</button>`).join('')}</div>
+    <div class="row"><button id="btnUnhide">Restore hidden items (${S.hidden.length})</button></div>
+    <div class="row"><button id="btnReset">Clear all saved data</button></div>`;
+}
+
+/* ---------- actions ---------- */
+async function addItems(text){
+  const names = [...new Set(text.split(/[\n,]/).map(l => l.split('\t')[0].trim()).filter(Boolean))];
+  if (!names.length) return;
+  try {
+    const r = await esi('/universe/ids/', {method:'POST', body:names});
+    const found = r.data.inventory_types || [];
+    for (const f of found) { if (!S.watch.includes(f.id)) S.watch.push(f.id); S.hidden = S.hidden.filter(x => x !== f.id); }
+    save(); $('#addNames').value = '';
+    const missing = names.filter(n => !found.some(f => f.name.toLowerCase() === n.toLowerCase()));
+    await refresh();
+    if (missing.length) status(`Not found (names must match exactly): ${missing.join(', ')}`, 'err');
+  } catch (e) { status(e.message, 'err'); }
+}
+function notifyNew(){
+  const fresh = D.updates.filter(u => !alerted.has(`${u.o.order_id}:${u.comp}`));
+  fresh.forEach(u => alerted.add(`${u.o.order_id}:${u.comp}`));
+  saveJSON(AKEY, [...alerted].slice(-500));
+  if (!fresh.length || !S.settings.notify || !('Notification' in window) || Notification.permission !== 'granted') return;
+  new Notification(`${fresh.length} order${fresh.length > 1 ? 's' : ''} to update`, {body: fresh.slice(0, 5).map(u => T[u.tid]?.name).join(', ')});
+}
+
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button,th,tr.item'); if (!t) return;
+  if (t.dataset.tab) { tab = t.dataset.tab; document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab)); $('#tabMarket').hidden = tab !== 'market'; $('#tabMats').hidden = tab !== 'mats'; if (tab === 'mats') { renderMats(); if (!D.matsLoaded) loadMaterials(); } return; }
+  if (t.id === 'btnUnhide') { S.hidden = []; save(); renderSettings(); refresh(); return; }
+  if (t.id === 'btnRetryMats') { D.bpMissing = false; loadMaterials(); return; }
+  if (t.dataset.mtid) { const id = +t.dataset.mtid; mexp.has(id) ? mexp.delete(id) : mexp.add(id); renderMats(); return; }
+  if (t.id === 'btnSaveClient') { const v = $('#inClient').value.trim(); if (v) { S.clientId = v; save(); render(); } }
+  else if (t.id === 'btnLogin' || t.id === 'btnAddChar') login();
+  else if (t.id === 'btnRefresh') refresh();
+  else if (t.id === 'btnSettings') { renderSettings(); $('#settings').hidden = false; }
+  else if (t.id === 'btnClose') { $('#settings').hidden = true; }
+  else if (t.id === 'btnAdd') addItems($('#addNames').value);
+  else if (t.id === 'btnFind') {
+    const box = $('#results'); box.innerHTML = '<p class="muted">Searching…</p>';
+    try { const list = await findStructures($('#inStruct').value.trim());
+      window._found = list;
+      box.innerHTML = list.length ? list.map((s,i) => `<button data-pick="${i}">${esc(s.name)}${s.type_id === KEEPSTAR ? ' <span class="muted">(Keepstar)</span>' : ''}</button>`).join('')
+        : '<p class="muted">No structures found. Check the spelling, and that this character has docking access.</p>';
+    } catch (err) { box.innerHTML = `<p class="warn">${esc(err.message)}</p>`; }
+  }
+  else if (t.dataset.pick != null) pickStructure(window._found[+t.dataset.pick]).catch(err => status(err.message, 'err'));
+  else if (t.id === 'btnChangeStruct') { S.structure = null; D.updated = null; save(); $('#settings').hidden = true; render(); }
+  else if (t.dataset.remove) { delete S.chars[t.dataset.remove]; save(); renderSettings(); render(); }
+  else if (t.id === 'btnReset') { if (confirm('Clear the client ID, logins, watch list and costs?')) { localStorage.removeItem(KEY); localStorage.removeItem(TKEY); localStorage.removeItem(AKEY); location.reload(); } }
+  else if (t.dataset.copy) {
+    e.stopPropagation();
+    try { await navigator.clipboard.writeText(String(t.dataset.copy)); t.classList.add('done'); setTimeout(() => t.classList.remove('done'), 1200); } catch {}
+  }
+  else if (t.dataset.unwatch) { const id = +t.dataset.unwatch; S.watch = S.watch.filter(x => x !== id); if (!S.hidden.includes(id)) S.hidden.push(id); save(); D.watch = (D.watch || []).filter(x => x !== id); compute(); renderDesk(); }
+  else if (t.dataset.sort) { if (sortKey === t.dataset.sort) sortDir = -sortDir; else { sortKey = t.dataset.sort; sortDir = 1; } renderDesk(); }
+  else if (t.matches('tr.item')) { const id = +t.dataset.tid; expanded.has(id) ? expanded.delete(id) : expanded.add(id); renderDesk(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('tr.item')) e.target.click();
+  if (e.key === 'Enter' && e.target.id === 'addNames') addItems(e.target.value);
+  if (e.key === 'Escape') $('#settings').hidden = true;
+});
+function applyFilters(){
+  D.filter = {text: $('#fText').value.trim().toLowerCase(), kind: $('#fKind').value, active: $('#fActive').checked};
+  renderDesk(); if (tab === 'mats') renderMats();
+}
+document.addEventListener('input', e => { if (e.target.id === 'fText') applyFilters(); });
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'fKind' || t.id === 'fActive') { applyFilters(); return; }
+  if (t.dataset.set) {
+    const k = t.dataset.set;
+    if (t.type === 'checkbox') {
+      S.settings[k] = t.checked;
+      if (k === 'notify' && t.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    } else S.settings[k] = t.value === '' ? (k === 'freightPerM3' ? null : DEF[k]) : +t.value;
+    if (k === 'me') S.settings.me = Math.max(0, Math.min(10, Math.round(S.settings.me)));
+    save(); if (D.updated) { if (k === 'hangarMinValue') refresh(); else { compute(); renderDesk(); if (tab === 'mats') { if (k === 'me') loadMaterials(); else renderMats(); } } }
+  }
+  else if (t.id === 'inClient2') { S.clientId = t.value.trim(); save(); }
+  else if (t.dataset.cost) {
+    const id = +t.dataset.cost;
+    if (t.value === '') delete S.costOverrides[id]; else S.costOverrides[id] = +t.value;
+    save(); compute(); renderDesk();
+  }
+});
+
+(async () => {
+  try { await handleCallback(); } catch (e) { status(e.message, 'err'); }
+  render();
+  if (ready()) refresh();
+  setInterval(() => { if (S.settings.autoRefresh && ready() && !document.hidden) refresh(); }, 5*60*1000);
+})();
+</script>
+</body>
+</html>
