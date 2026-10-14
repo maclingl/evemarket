@@ -64,7 +64,9 @@ main{padding:20px;max-width:1500px;margin:0 auto}
 .tablebar h2{margin:0;font-size:20px}
 .tablebar .add{display:flex;gap:6px;flex:1;max-width:560px}
 .tablebar .add input{flex:1}
-.tablewrap{overflow-x:auto;background:var(--panel);border-radius:4px}
+.tablewrap{overflow:auto;max-height:calc(100vh - 90px);background:var(--panel);border-radius:0 0 4px 4px}
+.topscroll{overflow-x:auto;overflow-y:hidden;background:var(--panel);border-radius:4px 4px 0 0;border-bottom:1px solid var(--line)}
+.topscroll > div{height:1px}
 table.main{border-collapse:collapse;width:100%;min-width:1680px;font-size:14px}
 table.main th{text-align:right;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;font-size:14px}
 table.main th:first-child,table.main td:first-child{text-align:left}
@@ -72,6 +74,11 @@ table.main th.sorted{color:var(--text)}
 table.main td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 table.main tr.item{cursor:pointer}
 table.main tr.item:hover td{background:var(--panel2)}
+table.main > thead > tr > th{position:sticky;top:0;z-index:2;background:var(--panel);border-bottom:0;box-shadow:inset 0 -1px 0 var(--line)}
+table.main > thead > tr > th:first-child{left:0;z-index:3}
+table.main > tbody > tr > td:first-child{position:sticky;left:0;z-index:1;background:var(--panel)}
+table.main > tbody > tr.item:hover > td:first-child{background:var(--panel2)}
+table.main > tbody > tr.detailrow > td:first-child{background:var(--bg)}
 table.main tr.item td:first-child{font-weight:600;max-width:280px;overflow:hidden;text-overflow:ellipsis}
 .auto{color:var(--muted);font-weight:400;font-size:12px;margin-left:4px}
 .pos{color:var(--teal)} .neg{color:var(--red)}
@@ -715,6 +722,20 @@ const COLS = [
   {k:'signal', l:'Signal', v:r => RANK[r.signal], f:r => `<span class="badge b-${r.signal}">${r.signal[0].toUpperCase() + r.signal.slice(1)}</span>`}
 ];
 
+function syncTopScroll(){
+  document.querySelectorAll('.tablewrap').forEach(w => {
+    let top = w.previousElementSibling;
+    if (!top || !top.classList.contains('topscroll')) {
+      top = document.createElement('div'); top.className = 'topscroll'; top.innerHTML = '<div></div>'; w.before(top);
+      top.addEventListener('scroll', () => { if (w.scrollLeft !== top.scrollLeft) w.scrollLeft = top.scrollLeft; });
+      w.addEventListener('scroll', () => { if (top.scrollLeft !== w.scrollLeft) top.scrollLeft = w.scrollLeft; });
+    }
+    const t = w.querySelector('table');
+    top.firstChild.style.width = (t ? t.scrollWidth : 0) + 'px';
+    top.style.display = t && t.scrollWidth > w.clientWidth + 1 ? '' : 'none';
+    top.scrollLeft = w.scrollLeft;
+  });
+}
 function renderDesk(){
   const u = $('#updated'); u.textContent = D.updated ? `Updated ${D.updated.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
   if (!D.updated) { $('#tbl tbody').innerHTML = ''; return; }
@@ -905,6 +926,11 @@ document.addEventListener('change', async e => {
   }
 });
 
+if ('ResizeObserver' in window) {
+  const ro = new ResizeObserver(() => syncTopScroll());
+  document.querySelectorAll('.tablewrap, .tablewrap > table').forEach(el => ro.observe(el));
+}
+window.addEventListener('resize', syncTopScroll);
 (async () => {
   try { await handleCallback(); } catch (e) { status(e.message, 'err'); }
   render();
