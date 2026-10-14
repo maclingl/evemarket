@@ -65,7 +65,7 @@ main{padding:20px;max-width:1500px;margin:0 auto}
 .tablebar .add{display:flex;gap:6px;flex:1;max-width:560px}
 .tablebar .add input{flex:1}
 .tablewrap{overflow-x:auto;background:var(--panel);border-radius:4px}
-table.main{border-collapse:collapse;width:100%;min-width:1480px;font-size:14px}
+table.main{border-collapse:collapse;width:100%;min-width:1580px;font-size:14px}
 table.main th{text-align:right;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;font-size:14px}
 table.main th:first-child,table.main td:first-child{text-align:left}
 table.main th.sorted{color:var(--text)}
@@ -152,7 +152,7 @@ aside.settings .hint{font-size:13px;color:var(--muted);margin:2px 0 8px}
     </div>
     <div class="tablebar"><h2>Watched items</h2><span class="muted num" id="shown"></span></div>
     <div class="tablewrap"><table class="main" id="tbl"><thead></thead><tbody></tbody></table></div>
-    <p class="foot muted">Click a row for price history, the local order book and your cost. The tabs cover Tech I capital modules (no rigs, no named meta variants, nothing where a rare BPC is most of the cost), T1 ships and T2 ships, whether you own them or not. Highlighted prices are below what the item reprocesses for, using the yield and prices in Settings. Hide any you don't trade with "Stop watching"; Settings can restore them. Orders on other items aren't tracked. Price history is region-wide, so it includes any other markets in the region. Corporation hangars and corporation orders are not included. The structure market refreshes about every 5 minutes on CCP's side.</p>
+    <p class="foot muted">Click a row for price history, the local order book and your cost. The tabs cover Tech I capital modules (no rigs, no named meta variants, nothing where a rare BPC is most of the cost), T1 ships and T2 ships, whether you own them or not. Highlighted prices are below what the item reprocesses for in that same market (local prices against local output prices, Jita against Jita), using the yield in Settings. Hide any you don't trade with "Stop watching"; Settings can restore them. Orders on other items aren't tracked. Price history is region-wide, so it includes any other markets in the region. Corporation hangars and corporation orders are not included. The structure market refreshes about every 5 minutes on CCP's side.</p>
     </div>
     <div id="tabMats" hidden>
       <div class="tablebar"><h2>Material cost vs market price</h2></div>
@@ -595,26 +595,33 @@ function compute(){
 
     rows.push({tid, name:T[tid]?.name || `Type ${tid}`, auto: D.auto.has(tid) && !S.watch.includes(tid),
       hangar, onSale, onBuy, cost, costAuto, compSell, compBuy, supply, h, margin, j, importCost, importMargin,
-      bidAt, flipMargin, daysStock, sig, signal:sig[0].k, reproc: reprocValue(tid)});
+      bidAt, flipMargin, daysStock, sig, signal:sig[0].k, rpLocal: reprocValue(tid, 'local'), rpJita: reprocValue(tid, 'jita')});
   }
   D.rows = rows; D.updates = updates; D.rowMap = new Map(rows.map(r => [r.tid, r]));
 }
 
-function reprocValue(tid){
+function reprocValue(tid, where){
   const mats = REPROC[tid]; if (!mats) return null;
   const st = S.settings, y = st.reproYield/100;
   let v = 0, missing = 0;
   for (const [m, q] of mats) {
     const n = Math.floor(q*y); if (!n) continue;
-    const j = D.jita[m], p = j ? (st.reproPrice === 'sell' ? (j.sell ?? j.buy) : (j.buy ?? j.sell)) : null;
+    const j = where === 'local'
+      ? (D.byType[m] ? {buy: D.byType[m].buy[0]?.price ?? null, sell: D.byType[m].sell[0]?.price ?? null} : null)
+      : D.jita[m];
+    const p = j ? (st.reproPrice === 'sell' ? (j.sell ?? j.buy) : (j.buy ?? j.sell)) : null;
     if (p == null) { missing++; continue; }
     v += n*p;
   }
   return {v: v*(1 - st.reproTax/100), missing};
 }
-function pcell(r, p){
-  const rv = r.reproc?.v;
-  return p != null && rv && p < rv ? `<span class="under" title="Below reprocessing value of ${price(rv)} ISK">${isk(p)}</span>` : isk(p);
+function pcell(r, p, where){
+  const rp = where === 'local' ? r.rpLocal : r.rpJita, rv = rp?.v;
+  const label = where === 'local' ? S.structure.systemName : 'Jita';
+  return p != null && rv && p < rv ? `<span class="under" title="Below its reprocessing value at ${esc(label)} prices: ${price(rv)} ISK">${isk(p)}</span>` : isk(p);
+}
+function rcell(rp){
+  return rp ? isk(rp.v) + (rp.missing ? ` <span class="muted" title="${rp.missing} output(s) have no price in this market and are left out">*</span>` : '') : '–';
 }
 /* ---------- rendering ---------- */
 function passes(tid){
@@ -678,11 +685,12 @@ const COLS = [
   {k:'hangar', l:'Hangar', v:r => r.hangar, f:r => r.hangar || ''},
   {k:'onSale', l:'Listed', v:r => r.onSale, f:r => (r.onSale || '') + (r.onBuy ? ` <span class="muted">+${r.onBuy} bid</span>` : '')},
   {k:'cost', l:'Your cost', v:r => r.cost, f:r => isk(r.cost)},
-  {k:'compSell', l:'Local sell', v:r => r.compSell, f:r => pcell(r, r.compSell)},
-  {k:'compBuy', l:'Local buy', v:r => r.compBuy, f:r => pcell(r, r.compBuy)},
-  {k:'jitaSell', l:'Jita sell', v:r => r.j.sell, f:r => pcell(r, r.j.sell)},
-  {k:'jitaBuy', l:'Jita buy', v:r => r.j.buy, f:r => pcell(r, r.j.buy)},
-  {k:'reproc', l:'Reprocess', v:r => r.reproc?.v, f:r => r.reproc ? isk(r.reproc.v) + (r.reproc.missing ? ` <span class="muted" title="${r.reproc.missing} material(s) have no Jita price and are left out">*</span>` : '') : '–'},
+  {k:'compSell', l:'Local sell', v:r => r.compSell, f:r => pcell(r, r.compSell, 'local')},
+  {k:'compBuy', l:'Local buy', v:r => r.compBuy, f:r => pcell(r, r.compBuy, 'local')},
+  {k:'jitaSell', l:'Jita sell', v:r => r.j.sell, f:r => pcell(r, r.j.sell, 'jita')},
+  {k:'jitaBuy', l:'Jita buy', v:r => r.j.buy, f:r => pcell(r, r.j.buy, 'jita')},
+  {k:'rpLocal', l:'Reprocess local', v:r => r.rpLocal?.v, f:r => rcell(r.rpLocal)},
+  {k:'rpJita', l:'Reprocess Jita', v:r => r.rpJita?.v, f:r => rcell(r.rpJita)},
   {k:'pct', l:'Vs history', v:r => r.h.pct, f:r => r.h.pct == null ? '–' :
     `<span class="bar" style="--lo:${S.settings.lowPct}%;--hi:${S.settings.highPct}%"><i style="left:${r.h.pct}%"></i></span>${Math.round(r.h.pct)}`},
   {k:'avg30', l:'30d avg', v:r => r.h.avg30, f:r => isk(r.h.avg30) + (r.h.trend != null ? ` <span class="${cls(r.h.trend)}">${r.h.trend >= 0 ? '+' : ''}${(r.h.trend*100).toFixed(0)}%</span>` : '')},
@@ -781,8 +789,8 @@ function renderSettings(){
     <h3>Reprocessing</h3>
     ${num('reproYield', 'Reprocessing yield (%)', 'Items reprocess at 50% in a structure, plus 2% per level of Scrapmetal Processing (55% at level V).')}
     ${num('reproTax', 'Reprocessing tax (%)')}
-    <label>Price outputs at<select data-set="reproPrice"><option value="buy" ${st.reproPrice !== 'sell' ? 'selected' : ''}>Jita buy</option><option value="sell" ${st.reproPrice === 'sell' ? 'selected' : ''}>Jita sell</option></select></label>
-    <p class="hint">Prices highlighted in the table are below this reprocessing value.</p>
+    <label>Price outputs at<select data-set="reproPrice"><option value="buy" ${st.reproPrice !== 'sell' ? 'selected' : ''}>Buy orders</option><option value="sell" ${st.reproPrice === 'sell' ? 'selected' : ''}>Sell orders</option></select></label>
+    <p class="hint">Local prices are highlighted when below the item's reprocessing value at ${S.structure ? esc(S.structure.systemName) : 'local'} prices; Jita prices when below its value at Jita prices.</p>
     <h3>Material cost</h3>
     ${num('me', 'Blueprint ME level (0 to 10)', 'Most items on the market are built from fully researched blueprints, so 10 is a reasonable default.')}
     <h3>Refreshing</h3>
